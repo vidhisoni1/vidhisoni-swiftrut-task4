@@ -1,81 +1,70 @@
 const express = require('express');
+const http = require('http');  // To create a server
+const socketIo = require('socket.io');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const cors = require('cors');
-const cron = require('node-cron');
-const Event = require('./models/Event'); // Import Event model
-const cloudinary = require('cloudinary').v2;
-const multer = require('multer');
-// const authRoutes = require('./routes/authRoute');
-// const eventRoute = require('./routes/eventRoute')
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const path = require('path');
+const authRoutes = require('./routes/auth');
+const eventRoutes = require('./routes/events');
 
+dotenv.config();
 
-   
+// MongoDB connection
+mongoose.connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+})
+.then(() => console.log('MongoDB connected'))
+.catch((err) => console.error('MongoDB connection error:', err));
 
-
-// Cloudinary configuration
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
-});
-
-// Multer storage using Cloudinary
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: 'event_images', // Folder name in Cloudinary
-    allowed_formats: ['jpg', 'png']
-  }
-});
-
-const upload = multer({ storage });
-
-
-// Run a cron job every day at midnight to send reminders for upcoming events
-cron.schedule('0 0 * * *', async () => {
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1); // Set the date to tomorrow
-
-  // Find events happening tomorrow
-  const upcomingEvents = await Event.find({
-    date: { $gte: today, $lte: tomorrow }
-  });
-
-  upcomingEvents.forEach(event => {
-    // Send notification to each attendee (You can use FCM, email, etc.)
-    event.attendees.forEach(attendee => {
-      console.log(`Reminder: The event ${event.title} is happening tomorrow.`);
-      // Trigger notification here (email, push, etc.)
-    });
-  });
-});
-
-
-dotenv.config(); // Load .env file
 const app = express();
-const eventRoutes = require('./routes/eventRoute');
-app.use('/api/events', eventRoutes);
+
+// Initialize HTTP server
+const server = http.createServer(app);
+
+// Initialize Socket.IO
+const io = socketIo(server, {
+    cors: {
+        origin: "*",  // Adjust this for security
+        methods: ["GET", "POST"],
+    },
+});
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/api/auth', authRoutes);
 
-// Import routes
-const authRoutes = require('./routes/authRoute');
-const eventRoute = require('./routes/eventRoute');
+// Middleware to pass Socket.IO instance to the routes
+app.use('/api/events', (req, res, next) => {
+    req.io = io;  // Attach socket.io instance to request object
+    next();
+}, eventRoutes);
 
-// Use routes
-app.use('/api/authRoute', authRoutes);  // For registration and login
-app.use('/api/event', eventRoute);  // For event management
-
-// Connect to MongoDB
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
+// Example route to check API is working
+app.get('/', (req, res) => {
+    res.send('API is running...');
 });
 
+// Error handling
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ message: 'Internal server error' });
+});
+
+// Listen on PORT
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
+
+// Handle Socket.IO connections
+io.on('connection', (socket) => {
+    console.log('New client connected', socket.id);
+
+    socket.on('disconnect', () => {
+        console.log('Client disconnected', socket.id);
+    });
+});

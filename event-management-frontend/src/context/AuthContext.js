@@ -1,51 +1,53 @@
-import React, { createContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import { createContext, useState, useEffect } from 'react';
+import api from '../api';
+import { useNavigate } from 'react-router-dom';
 
-export const AuthContext = createContext();
+const AuthContext = createContext();
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token') || null);
+const AuthProvider = ({ children }) => {
+    const [user, setUser] = useState(null);
+    const navigate = useNavigate();
 
-  useEffect(() => {
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      axios.get('/api/auth/me')
-        .then(res => setUser(res.data.user))
-        .catch(() => {
-          setToken(null);
-          localStorage.removeItem('token');
-        });
-    }
-  }, [token]);
+    const login = async (email, password) => {
+        try {
+            const { data } = await api.post('/auth/login', { email, password });
+            localStorage.setItem('authToken', data.token);
+            setUser({ email });
+            navigate('/');
+        } catch (error) {
+            console.error('Error logging in:', error.response ? error.response.data : error.message);
+        }
+    };
 
-  const login = async (email, password) => {
-    const res = await axios.post('/api/auth/login', { email, password });
-    const { token, user } = res.data;
-    setToken(token);
-    setUser(user);
-    localStorage.setItem('token', token);
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-  };
+    const register = async (username, email, password) => {
+        try {
+            const { data } = await api.post('/auth/register', { username, email, password });
+            localStorage.setItem('authToken', data.token);
+            setUser({ email });
+            navigate('/');
+        } catch (error) {
+            console.error('Error registering:', error.response ? error.response.data : error.message);
+        }
+    };
 
-  const register = async (name, email, password) => {
-    const res = await axios.post('http://localhost:5000/api/auth/register', { name, email, password });
-    const { token, user } = res.data;
-    setToken(token);
-    setUser(user);
-    localStorage.setItem('token', token);
-  };
-  
-  const logout = () => {
-    setToken(null);
-    setUser(null);
-    localStorage.removeItem('token');
-    delete axios.defaults.headers.common['Authorization'];
-  };
+    const logout = () => {
+        localStorage.removeItem('authToken');
+        setUser(null);
+        navigate('/login');
+    };
 
-  return (
-    <AuthContext.Provider value={{ user, login, register, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
+    useEffect(() => {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+            setUser({ email: 'placeholder_email@example.com' }); // Fetch real user data if needed
+        }
+    }, []);
+
+    return (
+        <AuthContext.Provider value={{ user, login, register, logout }}>
+            {children}
+        </AuthContext.Provider>
+    );
 };
+
+export { AuthContext, AuthProvider };

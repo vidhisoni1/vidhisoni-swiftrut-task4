@@ -1,67 +1,55 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import api from '../api';
+import { Navigate } from 'react-router-dom';
 
-const EditEvent = () => {
-    const { id } = useParams();
-    const [event, setEvent] = useState(null);
+const CreateEvent = () => {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [date, setDate] = useState('');
     const [location, setLocation] = useState('');
     const [maxAttendees, setMaxAttendees] = useState('');
-    const [errorMessage, setErrorMessage] = useState(''); // Add error message state
-    const navigate = useNavigate();
+    const [image, setImage] = useState(null);
+    const [errorMessage, setErrorMessage] = useState('');
 
-    useEffect(() => {
-        const fetchEvent = async () => {
-            try {
-                const token = localStorage.getItem('authToken');
-                const { data } = await api.get(`/events/${id}`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
-                setEvent(data);
-                setTitle(data.title);
-                setDescription(data.description);
-                setDate(data.date.split('T')[0]);
-                setLocation(data.location);
-                setMaxAttendees(data.maxAttendees);
-            } catch (error) {
-                console.error('Error fetching event:', error.response ? error.response.data : error.message);
-            }
-        };
-        fetchEvent();
-    }, [id]);
-
-    const handleUpdate = async (e) => {
+    const handleCreateEvent = async (e) => {
         e.preventDefault();
+        const formData = new FormData();
+        formData.append('title', title);
+        formData.append('description', description);
+        formData.append('date', date);
+        formData.append('location', location);
+        formData.append('maxAttendees', maxAttendees);
+        if (image) formData.append('image', image);
+    
         try {
-            const token = localStorage.getItem('authToken');
-            const updatedEvent = { title, description, date, location, maxAttendees };
-            await api.put(`/events/${id}`, updatedEvent, {
-                headers: { Authorization: `Bearer ${token}` },
+            const token = localStorage.getItem('authToken'); // Get the token from localStorage
+            const { data } = await api.post('/events/create', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                    'Authorization': `Bearer ${token}` // Attach the token to the request
+                },
             });
-            navigate('/my-events');
+            Navigate('/my-events');
+            console.log('Event created:', data);
         } catch (error) {
             const message = error.response ? error.response.data.error : error.message;
-            setErrorMessage(message); // Set error message if any
-            console.error('Error updating event:', message);
+            console.error('Error creating event:', message);
+            setErrorMessage(message);
         }
     };
 
-    if (!event) return <p>Loading event data...</p>;
-
     return (
-        <div className="container mt-5 col-5 bg-dark rounded-1 p-4">
-            <h2 className='text-center text-light'>Edit Event</h2>
+        <div className="container mt-5">
+            <div className='col-5 mx-auto bg-dark p-4 rounded-1'>
+            <h2 className='text-center text-light'>Create Event</h2>
             {errorMessage && (
                 <div className="alert alert-danger" role="alert">
                     {errorMessage}
                 </div>
             )}
-            <form onSubmit={handleUpdate}>
+            <form onSubmit={handleCreateEvent}>
                 <div className="mb-3">
-                    <label htmlFor="title" className="form-labe text-lightl">Title</label>
+                    <label htmlFor="title" className="form-label text-light">Title</label>
                     <input
                         type="text"
                         className="form-control"
@@ -115,12 +103,22 @@ const EditEvent = () => {
                         required
                     />
                 </div>
+                <div className="mb-3">
+                    <label htmlFor="image" className="form-label text-light">Upload Image</label>
+                    <input
+                        type="file"
+                        className="form-control"
+                        id="image"
+                        onChange={(e) => setImage(e.target.files[0])}
+                    />
+                </div>
                 <button type="submit" className="btn btn-danger w-100">
-                    Update Event
+                    Create Event
                 </button>
             </form>
+        </div>
         </div>
     );
 };
 
-export default EditEvent;
+export default CreateEvent;

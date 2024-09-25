@@ -1,30 +1,45 @@
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Home from './pages/Home';
-import CreateEvent from './pages/CreateEvent';
 import Navbar from './components/Navbar';
-import Footer from './components/Footer';
+import Login from './components/Login';
+import Register from './components/Register';
+import EventList from './components/EventList';
+import CreateEvent from './components/CreateEvent';
+import EventDetails from './pages/EventDetails';
+import MyEvents from './pages/MyEvents';
+import EditEvent from './pages/EditEvent'; // Import EditEvent
+import ProtectedRoute from './components/ProtectedRoute';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
-
 function App() {
-  return (
-    <AuthProvider>
-      <Router>
-        <Navbar/>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/createEvent" element={<CreateEvent />} />
-        </Routes>
-        <Footer/>
-      </Router>
-    </AuthProvider>
-  );
+    return (
+        <Router>
+            <AuthProvider>
+                <Navbar />
+                <Routes>
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/register" element={<Register />} />
+                    <Route path="/" element={<EventList />} />
+                    <Route path="/create-event" element={
+                        <ProtectedRoute>
+                            <CreateEvent />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="/events/:id" element={<EventDetails />} />
+                    <Route path="/my-events" element={
+                        <ProtectedRoute>
+                            <MyEvents />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="/edit-event/:id" element={
+                        <ProtectedRoute>
+                            <EditEvent />
+                        </ProtectedRoute>
+                    } />
+                </Routes>
+            </AuthProvider>
+        </Router>
+    );
 }
 
 export default App;
